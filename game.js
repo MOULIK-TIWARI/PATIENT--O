@@ -1,14 +1,18 @@
-// 1. CONFIGURATION
-var config = {
+// Simple Stickman Game - 5 Levels
+// This code will work on your computer without Devvit
+
+// Phaser game configuration
+const config = {
     type: Phaser.AUTO,
     width: 800,
-    height: 600,
-    parent: 'game-container',
+    height: 400,
+    parent: 'phaser-game',
+    backgroundColor: '#111133',
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 1000 },
-            debug: true // KEEP THIS TRUE! It's essential for debugging.
+            gravity: { y: 0 },
+            debug: false
         }
     },
     scene: {
@@ -18,78 +22,118 @@ var config = {
     }
 };
 
-var game = new Phaser.Game(config);
+// Create the game
+const game = new Phaser.Game(config);
 
-// 2. DEFINE YOUR VARIABLES
-var player;
-var platforms;
-var cursors;
-var spaceKey;
-var attackKey;
+// Game variables
+let player, cursors, enemies, level, playerHealth, attackZone;
+let levelText, healthText;
 
-// 3. PRELOAD FUNCTION
 function preload() {
-    // Load placeholder images
-    this.load.image('sky', 'assets/sky.png');
-    this.load.image('ground', 'assets/ground.png');
-    this.load.image('player', 'assets/player.png');
+    // We'll load assets here tomorrow
+    // this.load.image('player', 'assets/player.png');
 }
 
-// 4. CREATE FUNCTION
 function create() {
-    // Add background
-    this.add.image(400, 300, 'sky');
-
-    // Create platforms group and the ground
-    platforms = this.physics.add.staticGroup();
-    var ground = platforms.create(400, 568, 'ground').setScale(2).refreshBody();
-
-    // CREATE THE PLAYER
-    player = this.physics.add.sprite(100, 450, 'player');
-    player.setBounce(0.2);
-    player.setCollideWorldBounds(true); // Keep player in the game world
-
-    // Make player collide with platforms
-    this.physics.add.collider(player, platforms);
-
-    // SETUP KEYBOARD INPUT
+    // Setup game state
+    level = 1;
+    playerHealth = 100;
+    enemies = this.physics.add.group();
+    
+    // Create floor
+    this.add.rectangle(400, 390, 800, 20, 0x444444);
+    
+    // Create player (stickman)
+    player = this.add.rectangle(100, 300, 20, 50, 0xffffff);
+    this.physics.add.existing(player);
+    player.body.setCollideWorldBounds(true);
+    
+    // Create attack zone (invisible)
+    attackZone = this.add.rectangle(140, 300, 40, 30, 0xff0000, 0.3);
+    this.physics.add.existing(attackZone);
+    
+    // Setup keyboard input
     cursors = this.input.keyboard.createCursorKeys();
-    spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
-
-    // DEBUG TEXT - Very Important!
-    debugText = this.add.text(10, 10, 'Debug Info:', { fontSize: '16px', fill: '#fff' });
+    this.input.keyboard.on('keydown-SPACE', attack, this);
+    
+    // Create enemies for level 1
+    createEnemies.call(this);
+    
+    // Setup HUD
+    levelText = document.getElementById('levelText');
+    healthText = document.getElementById('healthText');
+    updateHUD();
 }
 
-// 5. UPDATE FUNCTION - Runs every frame
 function update() {
-    // Update debug text to see what's happening
-    debugText.setText([
-        'Velocity Y: ' + player.body.velocity.y.toFixed(2),
-        'Blocked Down: ' + player.body.blocked.down, // <- Check this line!
-        'Touching Down: ' + player.body.touching.down,
-        'Space Key: ' + spaceKey.isDown,
-        'Up Key: ' + cursors.up.isDown
-    ]);
-
-    // Reset horizontal movement every frame
-    player.setVelocityX(0);
-
-    // LEFT AND RIGHT MOVEMENT
+    // Movement
+    player.body.setVelocityX(0);
+    
     if (cursors.left.isDown) {
-        player.setVelocityX(-160);
+        player.body.setVelocityX(-160);
     } else if (cursors.right.isDown) {
-        player.setVelocityX(160);
+        player.body.setVelocityX(160);
     }
+    
+    // Keep attack zone with player
+    attackZone.x = player.x + 30;
+    attackZone.y = player.y;
+    
+    // Check for level completion
+    if (enemies.countActive(true) === 0) {
+        level++;
+        if (level > 5) {
+            showFinalCutscene.call(this);
+        } else {
+            createEnemies.call(this);
+            updateHUD();
+        }
+    }
+}
 
-    // JUMPING - SIMPLIFIED AND FIXED
-    // Use 'blocked.down' which is more reliable for platforms
-    if ((cursors.up.isDown || spaceKey.isDown) && player.body.blocked.down) {
-        player.setVelocityY(-330); // This makes the player jump upwards
-    }
+function attack() {
+    // Check if attack hits any enemies
+    enemies.getChildren().forEach(enemy => {
+        if (Phaser.Geom.Rectangle.Overlaps(
+            attackZone.getBounds(),
+            enemy.getBounds()
+        )) {
+            enemy.health -= 10;
+            if (enemy.health <= 0) {
+                enemy.destroy();
+            }
+        }
+    });
+}
 
-    // ATTACKING
-    if (Phaser.Input.Keyboard.JustDown(attackKey)) {
-        console.log("Punch!");
+function createEnemies() {
+    enemies.clear(true, true);
+    
+    for (let i = 0; i < level; i++) {
+        const enemy = this.add.rectangle(600 + i * 60, 300, 20, 50, 0xff0000);
+        this.physics.add.existing(enemy);
+        enemy.health = 30;
+        enemies.add(enemy);
     }
+}
+
+function updateHUD() {
+    healthText.textContent = playerHealth;
+    levelText.textContent = level;
+}
+
+function showFinalCutscene() {
+    // Stop physics
+    this.physics.pause();
+    
+    // Create final message
+    const style = { font: '20px Arial', fill: '#ffffff' };
+    this.add.text(250, 150, 'The Doctor appears...', style);
+    this.add.text(200, 200, '"You have only been fighting yourself"', style);
+    this.add.text(300, 250, 'None of this is real...', style);
+    
+    // After 5 seconds, show credits
+    this.time.delayedCall(5000, () => {
+        this.add.text(350, 300, 'THE END', { font: '30px Arial', fill: '#ff0000' });
+    });
 }
