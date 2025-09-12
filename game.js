@@ -32,6 +32,12 @@ let levelText, healthText;
 function preload() {
     // We'll load assets here tomorrow
     // this.load.image('player', 'assets/player.png');
+    function preload() {
+    // Load our new sprite images
+    this.load.image('player', 'assets/player.png');
+    this.load.image('enemy', 'assets/enemy.png');
+    this.load.image('attack', 'assets/attack.png'); // Load the attack sprite if you made it
+}
 }
 
 function create() {
